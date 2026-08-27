@@ -27,6 +27,8 @@ body {
 }
 .sync-bar button:hover { background: #3a71ab; }
 #sync-status { opacity: 0.9; }
+#signin-btn { background: #00A651; }
+#signin-btn:hover { background: #00c05e; }
 
 /* ── Page shell ── */
 .page {
@@ -229,8 +231,11 @@ body {
 <body>
 
 <div class="sync-bar no-print">
-  <span id="sync-status">Connecting to SharePoint…</span>
-  <button onclick="manualRefresh()">&#8635; Refresh from SharePoint</button>
+  <span id="sync-status">Not signed in</span>
+  <span>
+    <button id="signin-btn" onclick="signIn()">Sign in with Microsoft</button>
+    <button onclick="manualRefresh()">&#8635; Refresh from SharePoint</button>
+  </span>
 </div>
 
 <div class="page">
@@ -532,25 +537,46 @@ function setSyncStatus(msg) {
   if (el) el.textContent = msg;
 }
 
-async function ensureAuth() {
+function getMsal() {
   if (!msalInstance) msalInstance = new msal.PublicClientApplication(msalConfig);
+  return msalInstance;
+}
+
+function showSignInButton() { var b = document.getElementById('signin-btn'); if (b) b.style.display = ''; }
+function hideSignInButton() { var b = document.getElementById('signin-btn'); if (b) b.style.display = 'none'; }
+
+/* Only usable from inside a real user click (e.g. the Sign In button) —
+   browsers block popups that aren't triggered by direct user interaction. */
+async function interactiveSignIn() {
+  const msalApp = getMsal();
+  const resp = await msalApp.loginPopup({ scopes: GRAPH_SCOPES });
+  _account = resp.account;
+  return resp.accessToken;
+}
+
+/* Silent-only token fetch — safe to call automatically on page load,
+   never opens a popup, just fails quietly if not already signed in. */
+async function silentToken() {
+  const msalApp = getMsal();
   if (!_account) {
-    const existing = msalInstance.getAllAccounts();
-    if (existing.length > 0) {
-      _account = existing[0];
-    } else {
-      setSyncStatus('Signing in…');
-      const resp = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
-      _account = resp.account;
-    }
+    const existing = msalApp.getAllAccounts();
+    if (existing.length === 0) return null;
+    _account = existing[0];
   }
   try {
-    const tokenResp = await msalInstance.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: _account });
+    const tokenResp = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: _account });
     return tokenResp.accessToken;
   } catch (e) {
-    const tokenResp = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES });
-    return tokenResp.accessToken;
+    return null;
   }
+}
+
+/* Used by graphFetch — assumes signIn() has already happened, since only
+   silent (non-popup) refresh happens here. */
+async function ensureAuth() {
+  const token = await silentToken();
+  if (token) return token;
+  throw new Error('Not signed in — click "Sign in with Microsoft"');
 }
 
 async function graphFetch(path, opts) {
@@ -744,8 +770,41 @@ function wireEditableFields() {
   });
 }
 
+/* ── load shared state + render (call once we know we're authenticated) ── */
+async function loadAndRender() {
+  try {
+    setSyncStatus('Loading shared report…');
+    const loaded = await loadState();
+    if (loaded) {
+      appState = loaded;
+    } else {
+      appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+      await saveStateNow(); // create the file so it's there for the next person
+    }
+    applyStateToDom();
+    hideSignInButton();
+    setSyncStatus('Connected — last loaded ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    setSyncStatus('Could not load: ' + e.message);
+    appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    applyStateToDom();
+  }
+}
+
+/* ── sign-in button handler (real user click — popup allowed) ── */
+async function signIn() {
+  setSyncStatus('Signing in…');
+  try {
+    await interactiveSignIn();
+    await loadAndRender();
+  } catch (e) {
+    setSyncStatus('Sign-in failed: ' + e.message);
+  }
+}
+
 /* ── manual refresh ── */
 async function manualRefresh() {
+  if (!_account) { return signIn(); }
   setSyncStatus('Refreshing…');
   try {
     const loaded = await loadState();
@@ -761,26 +820,17 @@ async function manualRefresh() {
   }
 }
 
-/* ── init ── */
+/* ── init (runs on page load — silent-only, never pops up a login box) ── */
 async function init() {
   wireEditableFields();
-  try {
-    setSyncStatus('Signing in…');
-    await ensureAuth();
-    setSyncStatus('Loading shared report…');
-    const loaded = await loadState();
-    if (loaded) {
-      appState = loaded;
-    } else {
-      appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-      await saveStateNow(); // create the file so it's there for the next person
-    }
-    applyStateToDom();
-    setSyncStatus('Connected — last loaded ' + new Date().toLocaleTimeString());
-  } catch (e) {
-    setSyncStatus('Could not connect: ' + e.message + ' — click Refresh to retry');
-    appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-    applyStateToDom();
+  appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  applyStateToDom();
+  const token = await silentToken();
+  if (token) {
+    await loadAndRender();
+  } else {
+    setSyncStatus('Not signed in — click "Sign in with Microsoft" to load the shared report');
+    showSignInButton();
   }
 }
 
