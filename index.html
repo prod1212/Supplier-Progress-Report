@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>TI-516 ST Equipment - Progress Report (Shared)</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2/lib/msal-browser.min.js"></script>
 <style>
 /* ── Reset & base ── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -111,6 +111,19 @@ body {
 .editable:focus  { background: rgba(46,92,138,0.07); outline: 1px solid #2E5C8A; }
 .vendor-header.editable:hover { background: rgba(255,255,255,0.08); outline: 1px dashed rgba(255,255,255,0.5); }
 .vendor-header.editable:focus { background: rgba(255,255,255,0.12); outline: 1px solid rgba(255,255,255,0.8); }
+
+/* ── Locked state: before sign-in succeeds, nothing is editable —
+   edits made here can't be saved anywhere, so we don't allow them. ── */
+body.locked .editable { cursor: default; }
+body.locked .editable:hover { background: none; outline: none; }
+body.locked .drop-zone { pointer-events: none; opacity: 0.5; cursor: default; }
+.locked-banner {
+  display: none;
+  max-width: 8.5in; margin: 0 auto; padding: 8px 14px;
+  background: #FFF4E5; color: #8a5a00; font-size: 9pt; text-align: center;
+  border-bottom: 1px solid #f0c987;
+}
+body.locked .locked-banner { display: block; }
 
 /* ── Photo placeholder ── */
 .photo-placeholder {
@@ -228,7 +241,7 @@ body {
 }
 </style>
 </head>
-<body>
+<body class="locked">
 
 <div class="sync-bar no-print">
   <span id="sync-status">Not signed in</span>
@@ -236,6 +249,10 @@ body {
     <button id="signin-btn" onclick="signIn()">Sign in with Microsoft</button>
     <button onclick="manualRefresh()">&#8635; Refresh from SharePoint</button>
   </span>
+</div>
+
+<div class="locked-banner no-print">
+  🔒 Sign in with Microsoft above to load and edit the shared report — nothing you type or drop here is saved until you do.
 </div>
 
 <div class="page">
@@ -715,11 +732,15 @@ function updateDropLabel(idx) {
 
 function handleDrop(e, idx) {
   e.preventDefault();
-  document.getElementById('drop-zone-' + idx).classList.remove('dragover');
+  var zone = document.getElementById('drop-zone-' + idx);
+  zone.classList.remove('dragover');
+  if (zone.hasAttribute('data-locked')) return;
   readFiles(e.dataTransfer.files, idx);
 }
 
 function browseFiles(idx) {
+  var zone = document.getElementById('drop-zone-' + idx);
+  if (zone && zone.hasAttribute('data-locked')) return;
   var inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
   inp.onchange = function() { readFiles(inp.files, idx); };
@@ -770,6 +791,22 @@ function wireEditableFields() {
   });
 }
 
+/* ── lock/unlock the whole form — locked until sign-in + load succeeds,
+   since nothing typed or dropped before that point can actually be saved. ── */
+function setLocked(locked) {
+  document.body.classList.toggle('locked', locked);
+  document.querySelectorAll('[data-key]').forEach(function(el) {
+    el.setAttribute('contenteditable', locked ? 'false' : 'true');
+  });
+  for (var i = 0; i < VENDOR_COUNT; i++) {
+    var zone = document.getElementById('drop-zone-' + i);
+    if (zone) {
+      if (locked) zone.setAttribute('data-locked', '1');
+      else zone.removeAttribute('data-locked');
+    }
+  }
+}
+
 /* ── load shared state + render (call once we know we're authenticated) ── */
 async function loadAndRender() {
   try {
@@ -783,6 +820,7 @@ async function loadAndRender() {
     }
     applyStateToDom();
     hideSignInButton();
+    setLocked(false);
     setSyncStatus('Connected — last loaded ' + new Date().toLocaleTimeString());
   } catch (e) {
     setSyncStatus('Could not load: ' + e.message);
@@ -823,6 +861,7 @@ async function manualRefresh() {
 /* ── init (runs on page load — silent-only, never pops up a login box) ── */
 async function init() {
   wireEditableFields();
+  setLocked(true);
   appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
   applyStateToDom();
   const token = await silentToken();
