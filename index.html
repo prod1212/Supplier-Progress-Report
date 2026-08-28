@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>TI-516 ST Equipment - Progress Report (Shared)</title>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2/lib/msal-browser.min.js"></script>
+<title>TI-516 ST Equipment - 50% Completion Progress Report</title>
+<script src="https://cdn.jsdelivr.net/npm/libheif-js@1.19.8/libheif-wasm/libheif-bundle.js"></script>
 <style>
 /* ── Reset & base ── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -14,28 +14,12 @@ body {
   background: #e8e8e8;
 }
 
-/* ── Sync bar ── */
-.sync-bar {
-  max-width: 8.5in; margin: 0 auto; padding: 8px 14px;
-  background: #1F3664; color: #fff; font-size: 9pt;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; flex-wrap: wrap;
-}
-.sync-bar button {
-  background: #2E5C8A; color: #fff; border: none; border-radius: 3px;
-  padding: 5px 12px; font-size: 8.5pt; cursor: pointer; font-weight: bold;
-}
-.sync-bar button:hover { background: #3a71ab; }
-#sync-status { opacity: 0.9; }
-#signin-btn { background: #00A651; }
-#signin-btn:hover { background: #00c05e; }
-
 /* ── Page shell ── */
 .page {
   width: 8.5in;
   min-height: 11in;
   background: #fff;
-  margin: 0 auto 0.4in;
+  margin: 0.4in auto;
   box-shadow: 0 2px 12px rgba(0,0,0,0.18);
 }
 
@@ -109,19 +93,17 @@ body {
 .editable { border-radius: 3px; transition: background 0.15s; cursor: text; }
 .editable:hover  { background: rgba(46,92,138,0.05); outline: 1px dashed #b0c4de; }
 .editable:focus  { background: rgba(46,92,138,0.07); outline: 1px solid #2E5C8A; }
+/* vendor header is dark — use light outline */
 .vendor-header.editable:hover { background: rgba(255,255,255,0.08); outline: 1px dashed rgba(255,255,255,0.5); }
 .vendor-header.editable:focus { background: rgba(255,255,255,0.12); outline: 1px solid rgba(255,255,255,0.8); }
 
-/* ── Locked state: before sign-in succeeds, the whole report is disabled
-   and dimmed — nothing typed, clicked, or dropped here can be saved yet. ── */
-body.locked .page { opacity: 0.45; pointer-events: none; filter: grayscale(40%); user-select: none; }
-.locked-banner {
-  display: none;
-  max-width: 8.5in; margin: 0 auto; padding: 8px 14px;
-  background: #FFF4E5; color: #8a5a00; font-size: 9pt; text-align: center;
-  border-bottom: 1px solid #f0c987;
-}
-body.locked .locked-banner { display: block; }
+/* ── Static photo grid ── */
+.photo-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+.photo-cell  { width: 50%; padding: 6px; text-align: center; vertical-align: top; }
+.photo       { max-width: 100%; max-height: 2.8in; object-fit: contain;
+               border: 1px solid #ddd;
+               box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+               padding: 4px; background: #fff; }
 
 /* ── Photo placeholder ── */
 .photo-placeholder {
@@ -185,11 +167,6 @@ body.locked .locked-banner { display: block; }
   line-height: 1.4;
 }
 .remove-photo-btn:hover { background: #C00000; }
-.upload-spinner {
-  width: calc(50% - 3px); display: flex; align-items: center; justify-content: center;
-  color: #999; font-size: 8.5pt; font-style: italic; padding: 20px 6px;
-  border: 1px dashed #ddd; border-radius: 3px; background: #fafafa;
-}
 
 .vendor-rule { border: none; border-top: 1px solid #ddd; margin: 10px 0 14px; }
 
@@ -202,29 +179,32 @@ body.locked .locked-banner { display: block; }
 /* ── Print / PDF ── */
 @media print {
   body { background: white; }
-  .sync-bar { display: none !important; }
   .page { width: 100%; margin: 0; box-shadow: none; }
   .letterhead { padding: 0.2in 0 0; }
   .content { padding: 0 0.75in 0.5in; }
   .no-print { display: none !important; }
   .remove-photo-btn { display: none; }
 
+  /* Each vendor on its own page */
   .page-break {
     display: block;
     page-break-before: always;
     break-before: page;
-    height: 0.4in;
+    height: 0.4in;   /* becomes breathing room at top of each new page */
   }
   .vendor-header { page-break-after: avoid; }
   .info-table    { page-break-after: avoid; }
   .status-row    { page-break-after: avoid; }
 
+  /* No editing UI in print */
   .editable { outline: none !important; background: transparent !important; cursor: default; }
+  /* Restore colored backgrounds that editable would wipe */
   .vendor-header  { background: #1F3664 !important; color: #fff !important; }
   .scope-cell     { background: #E8F0F8 !important; }
   .milestone-cell { background: #F3F7FB !important; }
   .status-cell    { background: #fff !important; }
 
+  /* Preserve background colors and photo mats in PDF */
   .vendor-header,
   .scope-cell, .milestone-cell, .status-cell,
   .badge.active-complete, .badge.active-inprocess,
@@ -233,26 +213,14 @@ body.locked .locked-banner { display: block; }
     print-color-adjust: exact;
   }
 
-  .dropped-photo-wrap img { max-height: 2.2in; }
+  /* Cap photo height so they don't bleed off page */
+  .photo, .dropped-photo-wrap img { max-height: 2.2in; }
 
   @page { size: letter; margin: 0.4in 0 0.5in; }
 }
 </style>
 </head>
-<body class="locked">
-
-<div class="sync-bar no-print">
-  <span id="sync-status">Not signed in</span>
-  <span>
-    <button id="signin-btn" onclick="signIn()">Sign in with Microsoft</button>
-    <button onclick="manualRefresh()">&#8635; Refresh from SharePoint</button>
-  </span>
-</div>
-
-<div class="locked-banner no-print">
-  🔒 Sign in with Microsoft above to load and edit the shared report — nothing you type or drop here is saved until you do.
-</div>
-
+<body>
 <div class="page">
 
   <div class="letterhead">
@@ -273,11 +241,199 @@ body.locked .locked-banner { display: block; }
        contenteditable="true"
        data-key="ti516_intro"
        style="margin-top:12px">
-      The following report documents fabrication progress for all suppliers on
+      The following report documents fabrication progress for all five (5) suppliers on
       Project TI-516 &ndash; ST Equipment as of August 27, 2026.
+      Four of five shops are confirmed at the 100% milestone.
       Photos are included where received; remaining sections will be updated as
       documentation is submitted.
     </p>
+
+    <script>
+    /* ── Function definitions MUST run before the per-vendor init scripts
+       below (which call applyStatus/loadDroppedPhotos immediately), so this
+       block is placed here, ahead of {vendor_blocks}. Do not move it below. ── */
+
+    /* ── Editable text: generic data-key save/load via localStorage ── */
+    document.querySelectorAll('[data-key]').forEach(function(el) {
+      var saved = localStorage.getItem(el.dataset.key);
+      if (saved) el.innerHTML = saved;
+      el.addEventListener('blur', function() {
+        localStorage.setItem(el.dataset.key, el.innerHTML);
+      });
+    });
+
+    function applyStatus(idx, status) {
+  var bc = document.getElementById('btn-complete-'  + idx);
+  var bi = document.getElementById('btn-inprocess-' + idx);
+  if (!bc || !bi) return;
+  bc.className = 'badge badge-complete'  + (status === 'complete' ? ' active-complete'  : '');
+  bi.className = 'badge badge-inprocess' + (status !== 'complete' ? ' active-inprocess' : '');
+}
+function setStatus(idx, status) {
+  localStorage.setItem('ti516_status_' + idx, status);
+  applyStatus(idx, status);
+}
+
+var _db = null, _dbReady = false, _pendingLoads = [];
+(function() {
+  var req = indexedDB.open('TI516_photos_v1', 1);
+  req.onupgradeneeded = function(e) { e.target.result.createObjectStore('photos'); };
+  req.onsuccess = function(e) {
+    _db = e.target.result; _dbReady = true;
+    _pendingLoads.forEach(function(i) { loadDroppedPhotos(i); });
+  };
+  req.onerror = function() { _dbReady = true; };
+})();
+
+function dbKey(i) { return 'vendor_' + i; }
+
+function saveDroppedPhoto(idx, name, dataUrl) {
+  if (!_db) { renderPhoto(idx, name, dataUrl); return; }
+  var tx = _db.transaction('photos','readwrite'), st = tx.objectStore('photos');
+  var req = st.get(dbKey(idx));
+  req.onsuccess = function() {
+    var list = req.result || [];
+    if (!list.find(function(p){ return p.name===name; })) list.push({name:name,data:dataUrl});
+    st.put(list, dbKey(idx));
+    renderPhoto(idx, name, dataUrl);
+    updateDropLabel(idx);
+  };
+}
+
+function removeDroppedPhoto(idx, name) {
+  var grid = document.getElementById('dropped-grid-'+idx);
+  if (grid) grid.querySelectorAll('.dropped-photo-wrap').forEach(function(el){
+    if (el.dataset.name===name) el.remove();
+  });
+  if (!_db) return;
+  var tx = _db.transaction('photos','readwrite'), st = tx.objectStore('photos');
+  var req = st.get(dbKey(idx));
+  req.onsuccess = function() {
+    st.put((req.result||[]).filter(function(p){return p.name!==name;}), dbKey(idx));
+    updateDropLabel(idx);
+  };
+}
+
+function loadDroppedPhotos(idx) {
+  if (!_dbReady) { _pendingLoads.push(idx); return; }
+  if (!_db) return;
+  var tx = _db.transaction('photos','readonly'), st = tx.objectStore('photos');
+  var req = st.get(dbKey(idx));
+  req.onsuccess = function() {
+    (req.result||[]).forEach(function(p){ renderPhoto(idx,p.name,p.data); });
+    updateDropLabel(idx);
+  };
+}
+
+function renderPhoto(idx, name, dataUrl) {
+  var grid = document.getElementById('dropped-grid-'+idx);
+  if (!grid) return;
+  var wrap = document.createElement('div');
+  wrap.className = 'dropped-photo-wrap'; wrap.dataset.name = name;
+  var img = document.createElement('img'); img.src = dataUrl; img.alt = name;
+  var btn = document.createElement('button');
+  btn.className = 'remove-photo-btn no-print'; btn.textContent = '✕'; btn.title = 'Remove';
+  btn.onclick = function(e) { e.stopPropagation(); removeDroppedPhoto(idx,name); };
+  wrap.appendChild(img); wrap.appendChild(btn); grid.appendChild(wrap);
+}
+
+function updateDropLabel(idx) {
+  var grid=document.getElementById('dropped-grid-'+idx);
+  var label=document.getElementById('drop-label-'+idx);
+  var zone=document.getElementById('drop-zone-'+idx);
+  var ph=document.getElementById('placeholder-'+idx);
+  if (!grid||!label||!zone) return;
+  var count=grid.querySelectorAll('.dropped-photo-wrap').length;
+  if (ph) ph.style.display = count > 0 ? 'none' : '';
+  label.textContent = count > 0
+    ? count + ' photo' + (count===1?'':'s') + ' added — drop more or click to browse'
+    : (zone.classList.contains('has-photos')
+        ? 'Drop additional photos here — or click to browse'
+        : 'Drop photos here — or click to browse');
+  zone.classList.toggle('no-photos', count===0 && !zone.classList.contains('has-photos'));
+}
+
+function handleDrop(e, idx) {
+  e.preventDefault();
+  document.getElementById('drop-zone-'+idx).classList.remove('dragover');
+  readFiles(e.dataTransfer.files, idx);
+}
+
+function browseFiles(idx) {
+  var inp = document.createElement('input');
+  inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+  inp.onchange=function(){ readFiles(inp.files, idx); };
+  inp.click();
+}
+
+function isHeicFile(file) {
+      var name = (file.name || '').toLowerCase();
+      return name.endsWith('.heic') || name.endsWith('.heif') ||
+             file.type === 'image/heic' || file.type === 'image/heif';
+    }
+
+    /* Decode a HEIC/HEIF file entirely in the browser (via libheif-js/WASM)
+       and return a JPEG data URL — no server round-trip needed. */
+    function convertHeicToJpeg(file) {
+      return new Promise(function(resolve, reject) {
+        if (typeof libheif === 'undefined') {
+          reject(new Error('HEIC converter library did not load (no internet access?)'));
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            var buf = new Uint8Array(e.target.result);
+            var decoder = new libheif.HeifDecoder();
+            var images = decoder.decode(buf);
+            if (!images || !images.length) { reject(new Error('No image found in this HEIC file')); return; }
+            var image = images[0];
+            var w = image.get_width(), h = image.get_height();
+            image.display({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }, function(displayData) {
+              if (!displayData) { reject(new Error('HEIC decoding failed')); return; }
+              var canvas = document.createElement('canvas');
+              canvas.width = w; canvas.height = h;
+              var ctx = canvas.getContext('2d');
+              var imgData = new ImageData(displayData.data, w, h);
+              ctx.putImageData(imgData, 0, 0);
+              canvas.toBlob(function(blob) {
+                if (!blob) { reject(new Error('Could not export converted image')); return; }
+                var r2 = new FileReader();
+                r2.onload = function(ev) { resolve(ev.target.result); };
+                r2.onerror = function() { reject(new Error('Could not read converted image')); };
+                r2.readAsDataURL(blob);
+              }, 'image/jpeg', 0.92);
+            });
+          } catch (err) { reject(err); }
+        };
+        reader.onerror = function() { reject(new Error('Could not read file')); };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function readFiles(files, idx) {
+      var label = document.getElementById('drop-label-' + idx);
+      for (var i=0;i<files.length;i++) {
+        (function(file) {
+          if (isHeicFile(file)) {
+            if (label) label.textContent = 'Converting ' + file.name + '…';
+            convertHeicToJpeg(file).then(function(dataUrl) {
+              var jpgName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
+              saveDroppedPhoto(idx, jpgName, dataUrl);
+            }).catch(function(err) {
+              alert('Could not convert "' + file.name + '" (HEIC): ' + err.message +
+                    '\n\nTry: right-click the photo in File Explorer → Open with → Photos → ⋯ menu → Save a copy → JPEG, then drop that file instead.');
+              updateDropLabel(idx);
+            });
+          } else if (file.type.startsWith('image/')) {
+            var reader=new FileReader();
+            reader.onload=function(e){ saveDroppedPhoto(idx,file.name,e.target.result); };
+            reader.readAsDataURL(file);
+          }
+        })(files[i]);
+      }
+    }
+    </script>
 
     
     
@@ -311,10 +467,8 @@ body.locked .locked-banner { display: block; }
          contenteditable="true"
          data-key="ti516_notes_0">Weigh conveyor truss sections are fully welded out and assembled. Galvanized structural steel with idler roller assemblies in place. Paint and final inspection remain pending — consistent with the 100% milestone.</p>
 
-      <!-- Photo grid: populated from SharePoint-backed state by JS -->
-      <div class="dropped-grid" id="dropped-grid-0">
-        <div class="photo-placeholder" id="placeholder-0">[Completion photos coming soon]</div>
-      </div>
+      <!-- Unified photo grid: static photos pre-populated, dropped photos appended by JS -->
+      <div class="dropped-grid" id="dropped-grid-0"><div class="photo-placeholder" id="placeholder-0">[Completion photos coming soon]</div></div>
 
       <!-- Drag-and-drop zone (hidden in print/PDF) -->
       <div class="drop-zone no-print no-photos"
@@ -328,6 +482,14 @@ body.locked .locked-banner { display: block; }
 
       <hr class="vendor-rule">
     </div>
+
+    <script>
+    (function(){
+      var stored = localStorage.getItem("ti516_status_0");
+      applyStatus(0, stored || "complete");
+      loadDroppedPhotos(0);
+    })();
+    </script>
 
     <div class="page-break"></div>
     <div class="vendor-section">
@@ -360,10 +522,8 @@ body.locked .locked-banner { display: block; }
          contenteditable="true"
          data-key="ti516_notes_1">Feed bin hopper and cyclone body and cone are reported welded out and not yet painted — consistent with the 100% milestone. Photos to be submitted and will be added upon receipt.</p>
 
-      <!-- Photo grid: populated from SharePoint-backed state by JS -->
-      <div class="dropped-grid" id="dropped-grid-1">
-        <div class="photo-placeholder" id="placeholder-1">[Completion photos coming soon]</div>
-      </div>
+      <!-- Unified photo grid: static photos pre-populated, dropped photos appended by JS -->
+      <div class="dropped-grid" id="dropped-grid-1"><div class="photo-placeholder" id="placeholder-1">[Completion photos coming soon]</div></div>
 
       <!-- Drag-and-drop zone (hidden in print/PDF) -->
       <div class="drop-zone no-print no-photos"
@@ -377,6 +537,14 @@ body.locked .locked-banner { display: block; }
 
       <hr class="vendor-rule">
     </div>
+
+    <script>
+    (function(){
+      var stored = localStorage.getItem("ti516_status_1");
+      applyStatus(1, stored || "in_process");
+      loadDroppedPhotos(1);
+    })();
+    </script>
 
     <div class="page-break"></div>
     <div class="vendor-section">
@@ -409,10 +577,8 @@ body.locked .locked-banner { display: block; }
          contenteditable="true"
          data-key="ti516_notes_2">Baghouse hopper and center section are welded out and awaiting paint. Status confirmed at the 100% milestone. Photos pending — will be added upon submission.</p>
 
-      <!-- Photo grid: populated from SharePoint-backed state by JS -->
-      <div class="dropped-grid" id="dropped-grid-2">
-        <div class="photo-placeholder" id="placeholder-2">[Completion photos coming soon]</div>
-      </div>
+      <!-- Unified photo grid: static photos pre-populated, dropped photos appended by JS -->
+      <div class="dropped-grid" id="dropped-grid-2"><div class="photo-placeholder" id="placeholder-2">[Completion photos coming soon]</div></div>
 
       <!-- Drag-and-drop zone (hidden in print/PDF) -->
       <div class="drop-zone no-print no-photos"
@@ -426,6 +592,14 @@ body.locked .locked-banner { display: block; }
 
       <hr class="vendor-rule">
     </div>
+
+    <script>
+    (function(){
+      var stored = localStorage.getItem("ti516_status_2");
+      applyStatus(2, stored || "in_process");
+      loadDroppedPhotos(2);
+    })();
+    </script>
 
     <div class="page-break"></div>
     <div class="vendor-section">
@@ -458,10 +632,8 @@ body.locked .locked-banner { display: block; }
          contenteditable="true"
          data-key="ti516_notes_3">Rockwell shipped the Rensenhouse starters on 6/22/2026. Delivery to KG Moats is expected Friday, 6/27/2026. This section will be updated with confirmation and photos once delivery is received.</p>
 
-      <!-- Photo grid: populated from SharePoint-backed state by JS -->
-      <div class="dropped-grid" id="dropped-grid-3">
-        <div class="photo-placeholder" id="placeholder-3">[Completion photos coming soon]</div>
-      </div>
+      <!-- Unified photo grid: static photos pre-populated, dropped photos appended by JS -->
+      <div class="dropped-grid" id="dropped-grid-3"><div class="photo-placeholder" id="placeholder-3">[Completion photos coming soon]</div></div>
 
       <!-- Drag-and-drop zone (hidden in print/PDF) -->
       <div class="drop-zone no-print no-photos"
@@ -476,403 +648,22 @@ body.locked .locked-banner { display: block; }
       <hr class="vendor-rule">
     </div>
 
+    <script>
+    (function(){
+      var stored = localStorage.getItem("ti516_status_3");
+      applyStatus(3, stored || "in_process");
+      loadDroppedPhotos(3);
+    })();
+    </script>
+
 
     <div class="footer editable" contenteditable="true" data-key="ti516_footer">
       Tarmac International, Inc. &nbsp;|&nbsp;
       Project TI-516 &ndash; ST Equipment &nbsp;|&nbsp;
-      Progress Report &nbsp;|&nbsp; August 27, 2026
+      100% Completion Report &nbsp;|&nbsp; August 27, 2026
     </div>
 
   </div>
 </div>
-
-<script>
-/* ══════════════════════════════════════════════════════════════════════
-   SharePoint-backed shared state via Microsoft Graph + MSAL
-   ══════════════════════════════════════════════════════════════════════ */
-
-const AAD_CLIENT_ID  = "994cd211-dfec-46e4-b9fa-b4496fd29a37";
-const AAD_TENANT_ID  = "a8619271-37cc-49d6-bb45-5efb3e84fa33";
-const SP_HOSTNAME    = "tarmacinc.sharepoint.com";
-const SP_FOLDER      = "ST Equipment Share";
-const STATE_FILENAME = "ti516_state.json";
-const VENDOR_COUNT   = 4;
-const GRAPH_SCOPES   = ["Files.ReadWrite", "Sites.ReadWrite.All"];
-
-const DEFAULT_STATE = {
-  "fields": {
-    "ti516_h1": "100% COMPLETION PROGRESS REPORT",
-    "ti516_h2": "Project TI-516 &ndash; ST Equipment",
-    "ti516_date": "Date: August 27, 2026",
-    "ti516_intro": "The following report documents fabrication progress for all suppliers on Project TI-516 &ndash; ST Equipment as of August 27, 2026. Photos are included where received; remaining sections will be updated as documentation is submitted.",
-    "ti516_footer": "Tarmac International, Inc. &nbsp;|&nbsp; Project TI-516 &ndash; ST Equipment &nbsp;|&nbsp; Progress Report &nbsp;|&nbsp; August 27, 2026",
-    "ti516_vname_0": "KMEC / PURVIS INDUSTRIES",
-    "ti516_scope_0": "Weigh Conveyor Truss Sections",
-    "ti516_mile_0": "100% complete: weigh conveyor truss sections welded out (paint pending)",
-    "ti516_notes_0": "Weigh conveyor truss sections are fully welded out and assembled. Galvanized structural steel with idler roller assemblies in place. Paint and final inspection remain pending \u2014 consistent with the 100% milestone.",
-    "ti516_vname_1": "IMF, INC.",
-    "ti516_scope_1": "Feed Bin Hopper & Cyclone Body and Cone",
-    "ti516_mile_1": "100% complete: feed bin hopper and cyclone body/cone welded out (paint pending)",
-    "ti516_notes_1": "Feed bin hopper and cyclone body and cone are reported welded out and not yet painted \u2014 consistent with the 100% milestone. Photos to be submitted and will be added upon receipt.",
-    "ti516_vname_2": "HARRIS FABRICATION",
-    "ti516_scope_2": "Baghouse Hopper & Center Section",
-    "ti516_mile_2": "100% complete: baghouse hopper and center section welded out (paint pending)",
-    "ti516_notes_2": "Baghouse hopper and center section are welded out and awaiting paint. Status confirmed at the 100% milestone. Photos pending \u2014 will be added upon submission.",
-    "ti516_vname_3": "KG MOATS",
-    "ti516_scope_3": "Rensenhouse Starters - Delivery to Supplier",
-    "ti516_mile_3": "100% complete: Rensenhouse starters delivered to KG Moats",
-    "ti516_notes_3": "Rockwell shipped the Rensenhouse starters on 6/22/2026. Delivery to KG Moats is expected Friday, 6/27/2026. This section will be updated with confirmation and photos once delivery is received."
-  },
-  "statuses": {
-    "0": "complete",
-    "1": "in_process",
-    "2": "in_process",
-    "3": "in_process"
-  },
-  "photos": {}
-};
-
-let appState = null;
-let _siteId = null;
-let _account = null;
-let saveTimer = null;
-let msalInstance = null;
-
-const msalConfig = {
-  auth: {
-    clientId: AAD_CLIENT_ID,
-    authority: "https://login.microsoftonline.com/" + AAD_TENANT_ID,
-    redirectUri: window.location.href.split('#')[0].split('?')[0]
-  },
-  cache: { cacheLocation: "localStorage" }
-};
-
-function setSyncStatus(msg) {
-  var el = document.getElementById('sync-status');
-  if (el) el.textContent = msg;
-}
-
-function getMsal() {
-  if (!msalInstance) msalInstance = new msal.PublicClientApplication(msalConfig);
-  return msalInstance;
-}
-
-function showSignInButton() { var b = document.getElementById('signin-btn'); if (b) b.style.display = ''; }
-function hideSignInButton() { var b = document.getElementById('signin-btn'); if (b) b.style.display = 'none'; }
-
-/* Only usable from inside a real user click (e.g. the Sign In button) —
-   browsers block popups that aren't triggered by direct user interaction. */
-async function interactiveSignIn() {
-  const msalApp = getMsal();
-  const resp = await msalApp.loginPopup({ scopes: GRAPH_SCOPES });
-  _account = resp.account;
-  return resp.accessToken;
-}
-
-/* Silent-only token fetch — safe to call automatically on page load,
-   never opens a popup, just fails quietly if not already signed in. */
-async function silentToken() {
-  const msalApp = getMsal();
-  if (!_account) {
-    const existing = msalApp.getAllAccounts();
-    if (existing.length === 0) return null;
-    _account = existing[0];
-  }
-  try {
-    const tokenResp = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: _account });
-    return tokenResp.accessToken;
-  } catch (e) {
-    return null;
-  }
-}
-
-/* Used by graphFetch — assumes signIn() has already happened, since only
-   silent (non-popup) refresh happens here. */
-async function ensureAuth() {
-  const token = await silentToken();
-  if (token) return token;
-  throw new Error('Not signed in — click "Sign in with Microsoft"');
-}
-
-async function graphFetch(path, opts) {
-  opts = opts || {};
-  const token = await ensureAuth();
-  const headers = Object.assign({ 'Authorization': 'Bearer ' + token }, opts.headers || {});
-  return fetch('https://graph.microsoft.com/v1.0' + path, Object.assign({}, opts, { headers }));
-}
-
-async function getSiteId() {
-  if (_siteId) return _siteId;
-  const resp = await graphFetch('/sites/' + SP_HOSTNAME);
-  if (!resp.ok) throw new Error('Could not reach SharePoint site (status ' + resp.status + ')');
-  const data = await resp.json();
-  _siteId = data.id;
-  return _siteId;
-}
-
-function statePath() {
-  return '/sites/' + _siteId + '/drive/root:/' + encodeURIComponent(SP_FOLDER) + '/' + STATE_FILENAME + ':/content';
-}
-
-async function loadState() {
-  const siteId = await getSiteId();
-  const resp = await graphFetch(statePath());
-  if (resp.status === 404) return null;
-  if (!resp.ok) throw new Error('Failed to load shared state (status ' + resp.status + ')');
-  return await resp.json();
-}
-
-async function saveStateNow() {
-  try {
-    const siteId = await getSiteId();
-    await graphFetch(statePath(), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(appState)
-    });
-    setSyncStatus('Saved ' + new Date().toLocaleTimeString());
-  } catch (e) {
-    setSyncStatus('Save failed — will retry: ' + e.message);
-  }
-}
-
-function scheduleSave() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveStateNow, 900);
-}
-
-/* ── apply loaded state to the DOM ── */
-function applyStateToDom() {
-  document.querySelectorAll('[data-key]').forEach(function(el) {
-    if (document.activeElement === el) return; // don't clobber active typing
-    var val = appState.fields && appState.fields[el.dataset.key];
-    if (val !== undefined) el.innerHTML = val;
-  });
-  for (var i = 0; i < VENDOR_COUNT; i++) {
-    var status = (appState.statuses && appState.statuses[String(i)]) || 'in_process';
-    applyStatus(i, status);
-    renderPhotosForVendor(i);
-  }
-}
-
-function applyStatus(idx, status) {
-  var bc = document.getElementById('btn-complete-'  + idx);
-  var bi = document.getElementById('btn-inprocess-' + idx);
-  if (!bc || !bi) return;
-  bc.className = 'badge badge-complete'  + (status === 'complete' ? ' active-complete'  : '');
-  bi.className = 'badge badge-inprocess' + (status !== 'complete' ? ' active-inprocess' : '');
-}
-
-function setStatus(idx, status) {
-  if (document.body.classList.contains('locked')) return;
-  appState.statuses = appState.statuses || {};
-  appState.statuses[String(idx)] = status;
-  applyStatus(idx, status);
-  scheduleSave();
-}
-
-/* ── photos: stored as {name, itemId} in appState.photos[idx], rendered
-     by fetching the item's bytes (authenticated) into a blob URL ── */
-
-function clearPhotoGrid(idx) {
-  var grid = document.getElementById('dropped-grid-' + idx);
-  if (!grid) return;
-  grid.querySelectorAll('.dropped-photo-wrap, .upload-spinner').forEach(function(el) { el.remove(); });
-}
-
-async function renderPhotosForVendor(idx) {
-  clearPhotoGrid(idx);
-  var list = (appState.photos && appState.photos[String(idx)]) || [];
-  var ph = document.getElementById('placeholder-' + idx);
-  if (ph) ph.style.display = list.length > 0 ? 'none' : '';
-  for (var i = 0; i < list.length; i++) {
-    renderPhotoBlob(idx, list[i].name, list[i].itemId);
-  }
-  updateDropLabel(idx);
-}
-
-async function renderPhotoBlob(idx, name, itemId) {
-  var grid = document.getElementById('dropped-grid-' + idx);
-  if (!grid) return;
-  try {
-    const siteId = await getSiteId();
-    const resp = await graphFetch('/sites/' + siteId + '/drive/items/' + itemId + '/content');
-    if (!resp.ok) return;
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    var wrap = document.createElement('div');
-    wrap.className = 'dropped-photo-wrap'; wrap.dataset.name = name; wrap.dataset.itemId = itemId;
-    var img = document.createElement('img'); img.src = url; img.alt = name; img.className = 'photo';
-    var btn = document.createElement('button');
-    btn.className = 'remove-photo-btn no-print'; btn.textContent = '✕'; btn.title = 'Remove';
-    btn.onclick = function(e) { e.stopPropagation(); removePhoto(idx, itemId); };
-    wrap.appendChild(img); wrap.appendChild(btn); grid.appendChild(wrap);
-  } catch (e) { /* ignore individual photo load failures */ }
-}
-
-function removePhoto(idx, itemId) {
-  var list = (appState.photos && appState.photos[String(idx)]) || [];
-  appState.photos[String(idx)] = list.filter(function(p) { return p.itemId !== itemId; });
-  renderPhotosForVendor(idx);
-  scheduleSave();
-}
-
-function updateDropLabel(idx) {
-  var grid = document.getElementById('dropped-grid-' + idx);
-  var label = document.getElementById('drop-label-' + idx);
-  var zone = document.getElementById('drop-zone-' + idx);
-  if (!grid || !label || !zone) return;
-  var count = grid.querySelectorAll('.dropped-photo-wrap').length;
-  label.textContent = count > 0
-    ? count + ' photo' + (count === 1 ? '' : 's') + ' added — drop more or click to browse'
-    : 'Drop photos here — or click to browse';
-  zone.classList.toggle('no-photos', count === 0);
-}
-
-function handleDrop(e, idx) {
-  e.preventDefault();
-  var zone = document.getElementById('drop-zone-' + idx);
-  zone.classList.remove('dragover');
-  if (zone.hasAttribute('data-locked')) return;
-  readFiles(e.dataTransfer.files, idx);
-}
-
-function browseFiles(idx) {
-  var zone = document.getElementById('drop-zone-' + idx);
-  if (zone && zone.hasAttribute('data-locked')) return;
-  var inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
-  inp.onchange = function() { readFiles(inp.files, idx); };
-  inp.click();
-}
-
-function readFiles(files, idx) {
-  for (var i = 0; i < files.length; i++) {
-    if (!files[i].type.startsWith('image/')) continue;
-    uploadPhoto(idx, files[i]);
-  }
-}
-
-async function uploadPhoto(idx, file) {
-  var grid = document.getElementById('dropped-grid-' + idx);
-  var spinner = document.createElement('div');
-  spinner.className = 'upload-spinner';
-  spinner.textContent = 'Uploading ' + file.name + '…';
-  if (grid) grid.appendChild(spinner);
-  try {
-    const siteId = await getSiteId();
-    const safeName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = '/sites/' + siteId + '/drive/root:/' + encodeURIComponent(SP_FOLDER) +
-                 '/photos/vendor' + idx + '/' + encodeURIComponent(safeName) + ':/content';
-    const resp = await graphFetch(path, { method: 'PUT', body: file });
-    if (!resp.ok) throw new Error('Upload failed (status ' + resp.status + ')');
-    const data = await resp.json();
-    appState.photos = appState.photos || {};
-    appState.photos[String(idx)] = appState.photos[String(idx)] || [];
-    appState.photos[String(idx)].push({ name: file.name, itemId: data.id });
-    scheduleSave();
-    await renderPhotosForVendor(idx);
-  } catch (e) {
-    setSyncStatus('Photo upload failed: ' + e.message);
-  } finally {
-    spinner.remove();
-  }
-}
-
-/* ── editable text fields ── */
-function wireEditableFields() {
-  document.querySelectorAll('[data-key]').forEach(function(el) {
-    el.addEventListener('blur', function() {
-      appState.fields = appState.fields || {};
-      appState.fields[el.dataset.key] = el.innerHTML;
-      scheduleSave();
-    });
-  });
-}
-
-/* ── lock/unlock the whole form — locked until sign-in + load succeeds,
-   since nothing typed or dropped before that point can actually be saved. ── */
-function setLocked(locked) {
-  document.body.classList.toggle('locked', locked);
-  document.querySelectorAll('[data-key]').forEach(function(el) {
-    el.setAttribute('contenteditable', locked ? 'false' : 'true');
-  });
-  for (var i = 0; i < VENDOR_COUNT; i++) {
-    var zone = document.getElementById('drop-zone-' + i);
-    if (zone) {
-      if (locked) zone.setAttribute('data-locked', '1');
-      else zone.removeAttribute('data-locked');
-    }
-  }
-}
-
-/* ── load shared state + render (call once we know we're authenticated) ── */
-async function loadAndRender() {
-  try {
-    setSyncStatus('Loading shared report…');
-    const loaded = await loadState();
-    if (loaded) {
-      appState = loaded;
-    } else {
-      appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-      await saveStateNow(); // create the file so it's there for the next person
-    }
-    applyStateToDom();
-    hideSignInButton();
-    setLocked(false);
-    setSyncStatus('Connected — last loaded ' + new Date().toLocaleTimeString());
-  } catch (e) {
-    setSyncStatus('Could not load: ' + e.message);
-    appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-    applyStateToDom();
-  }
-}
-
-/* ── sign-in button handler (real user click — popup allowed) ── */
-async function signIn() {
-  setSyncStatus('Signing in…');
-  try {
-    await interactiveSignIn();
-    await loadAndRender();
-  } catch (e) {
-    setSyncStatus('Sign-in failed: ' + e.message);
-  }
-}
-
-/* ── manual refresh ── */
-async function manualRefresh() {
-  if (!_account) { return signIn(); }
-  setSyncStatus('Refreshing…');
-  try {
-    const loaded = await loadState();
-    if (loaded) {
-      appState = loaded;
-      applyStateToDom();
-      setSyncStatus('Refreshed ' + new Date().toLocaleTimeString());
-    } else {
-      setSyncStatus('No shared state found yet — using defaults');
-    }
-  } catch (e) {
-    setSyncStatus('Refresh failed: ' + e.message);
-  }
-}
-
-/* ── init (runs on page load — silent-only, never pops up a login box) ── */
-async function init() {
-  wireEditableFields();
-  setLocked(true);
-  appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-  applyStateToDom();
-  const token = await silentToken();
-  if (token) {
-    await loadAndRender();
-  } else {
-    setSyncStatus('Not signed in — click "Sign in with Microsoft" to load the shared report');
-    showSignInButton();
-  }
-}
-
-window.addEventListener('DOMContentLoaded', init);
-</script>
 </body>
 </html>
