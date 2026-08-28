@@ -112,11 +112,9 @@ body {
 .vendor-header.editable:hover { background: rgba(255,255,255,0.08); outline: 1px dashed rgba(255,255,255,0.5); }
 .vendor-header.editable:focus { background: rgba(255,255,255,0.12); outline: 1px solid rgba(255,255,255,0.8); }
 
-/* ── Locked state: before sign-in succeeds, nothing is editable —
-   edits made here can't be saved anywhere, so we don't allow them. ── */
-body.locked .editable { cursor: default; }
-body.locked .editable:hover { background: none; outline: none; }
-body.locked .drop-zone { pointer-events: none; opacity: 0.5; cursor: default; }
+/* ── Locked state: before sign-in succeeds, the whole report is disabled
+   and dimmed — nothing typed, clicked, or dropped here can be saved yet. ── */
+body.locked .page { opacity: 0.45; pointer-events: none; filter: grayscale(40%); user-select: none; }
 .locked-banner {
   display: none;
   max-width: 8.5in; margin: 0 auto; padding: 8px 14px;
@@ -666,6 +664,7 @@ function applyStatus(idx, status) {
 }
 
 function setStatus(idx, status) {
+  if (document.body.classList.contains('locked')) return;
   appState.statuses = appState.statuses || {};
   appState.statuses[String(idx)] = status;
   applyStatus(idx, status);
